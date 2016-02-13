@@ -19,10 +19,10 @@ typedef struct {
     float normal;
 } norm_t;
 
-std::map<std::string, std::vector<float>> csv_read(std::string file);
+std::map<std::string, std::vector<float>> csv_read(const std::string file);
 //std::vector<csvRow_t> csv_read(std::string file);
 
-std::vector<norm_t> normalize( std::map<std::string, std::vector<float>> master, std::string key);
+std::vector<norm_t> normalize(std::map<std::string, std::vector<float>> master, const std::string key);
 
 bool norm_sort(const norm_t &a, const norm_t &b );
 

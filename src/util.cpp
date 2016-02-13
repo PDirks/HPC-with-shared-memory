@@ -21,7 +21,7 @@
 /*
  * Read from csv into map of csvRow_ts
  */
-std::map<std::string, std::vector<float>> csv_read(std::string file){
+std::map<std::string, std::vector<float>> csv_read(const std::string file){
     char *toks;
     std::string temp_fname;
     std::string line;
@@ -43,7 +43,7 @@ std::map<std::string, std::vector<float>> csv_read(std::string file){
     return csvMap;
 }// end csv_read
 
-std::vector<norm_t> normalize( std::map<std::string, std::vector<float>> master, std::string key){
+std::vector<norm_t> normalize(std::map<std::string, std::vector<float>> master, const std::string key){
     std::vector<float> reference_vector = master.at(key);
     std::vector<norm_t> normalized;
     const uint32_t size = master.size()-1;
@@ -71,7 +71,7 @@ void print_norm(const std::vector<norm_t> normalized, const uint32_t K ){
     for( uint32_t i = 1; i < K+1; i++ ){
         std::cout << "\t[" << i << "] "
             << normalized.at(i).fname << " -> "
-            << normalized.at(i).normal << "\n";
+            << normalized.at(i).normal << std::endl;
     }
 }
 
