@@ -8,6 +8,7 @@
 #include <algorithm>    // std::sort
 #include <cmath>        // std::abs
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -318,6 +319,7 @@ void pete::util::normalize(const uint32_t key){
 
 void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , const uint8_t procs ){
 
+    std::cout << "key: " << unsigned(key) << std::endl;
     const csvRow_t reference_vector = master.at(key);
 
 //// ### shm setup ###
@@ -371,7 +373,7 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 // ### CHILD PROC ###
     if( pid == 0 ){
         #if DEBUG
-        std::cout << MAGENTA << "[DEBUG] starting child proc " << unsigned(proc_id) << GREY << std::endl;
+        std::cout << MAGENTA << "[DEBUG] starting child proc " << unsigned(proc_id) << ", " << GREY << std::endl;
         #endif
 
         // compute local normal
@@ -398,8 +400,6 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
             norm2_t temp_norm = {it->first, normal_sum};
             local_norm[local_index] = temp_norm;
 
-//            std::cout << unsigned(proc_id) << "-> idx: " << local_index << std::endl;
-
             local_index++;
         }// end iterator for
 
@@ -409,12 +409,8 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 
         std::sort( &local_norm[0], &local_norm[local_index-1], norm_sort );
 
-        std::cout << unsigned(proc_id) << "->" <<local_norm[0].normal << ", " << local_norm[1].normal << ", " << local_norm[2].normal << "\n" << std::endl;
-
         // jump to correct block in shared memory
         shm += proc_id * K;    
-
-        std::cout << "[DEBUG] jumped to " << proc_id * K << std::endl;
 
         // store local_norm into shaBRED mem
         std::copy( local_norm, local_norm+K, shm);    //TODO memcpy or copy??
@@ -425,55 +421,64 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 		_exit(0);
     }// END CHILD
 // ### PARENT PROC ###
-	int status;	// catch the status of the child
-	do { 
-		pid_t w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-		if (w == -1){
-            #if DEBUG
-			std::cerr << BRED << "[DEBUG] Error waiting for child process ("<< pid <<")" << GREY << std::endl;
-            #endif
-			break;
-		}
-        std::cout << "~~~[DEBUG] wait signal " << w << std::endl;
-		if (WIFEXITED(status)){
-			if (status > 0){
-                #if DEBUG
-				std::cerr << CYAN << "[DEBUG] Child process ("<< pid <<") exited with non-zero status of " << WEXITSTATUS(status) << GREY << std::endl;
-                #endif
-				continue;
-			}
-			else{
-                #if DEBUG
-				std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") exited with status of " << WEXITSTATUS(status) << GREY << std::endl;
-                #endif
-				continue;
-			}
-		}
-		else if (WIFSIGNALED(status)){
-            #if DEBUG
-			std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") killed by signal (" << WTERMSIG(status) << ")" << GREY << std::endl;
-            #endif
-			continue;			
-		}
-		else if (WIFSTOPPED(status)){
-            #if DEBUG
-			std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") stopped by signal (" << WSTOPSIG(status) << ")" << GREY << std::endl;
-            #endif
-			continue;			
-		}
-		else if (WIFCONTINUED(status)){
-            #if DEBUG
-			std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") continued" << GREY << std::endl;
-            #endif
-			continue;
-		}
-	}
-	while (!WIFEXITED(status) && !WIFSIGNALED(status));
-
-    #if DEBUG
-    std::cout << MAGENTA << "[DEBUG] all children done " << GREY << std::endl;
+    #if BOILER_PLATE_JOIN
+    int status;	// catch the status of the child
     #endif
 
+    while (true){
+        siginfo_t exit_info;
+        int retVal = waitid(P_ALL, -1, &exit_info, WEXITED);
+        #if BOILER_PLATE_JOIN
+        do { 
+	        pid_t w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
+	        if (w == -1){
+                #if DEBUG
+		        std::cerr << BRED << "[DEBUG] Error waiting for child process ("<< pid <<")" << GREY << std::endl;
+                #endif
+		        break;
+	        }
+	        if (WIFEXITED(status)){
+		        if (status > 0){
+                    #if DEBUG
+			        std::cerr << CYAN << "[DEBUG] Child process ("<< pid <<") exited with non-zero status of " << WEXITSTATUS(status) << GREY << std::endl;
+                    #endif
+			        continue;
+		        }
+		        else{
+                    #if DEBUG
+			        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") exited with status of " << WEXITSTATUS(status) << GREY << std::endl;
+                    #endif
+			        continue;
+		        }
+	        }
+	        else if (WIFSIGNALED(status)){
+                #if DEBUG
+		        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") killed by signal (" << WTERMSIG(status) << ")" << GREY << std::endl;
+                #endif
+		        continue;			
+	        }
+	        else if (WIFSTOPPED(status)){
+                #if DEBUG
+		        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") stopped by signal (" << WSTOPSIG(status) << ")" << GREY << std::endl;
+                #endif
+		        continue;			
+	        }
+	        else if (WIFCONTINUED(status)){
+                #if DEBUG
+		        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") continued" << GREY << std::endl;
+                #endif
+		        continue;
+	        }
+        }
+        while (!WIFEXITED(status) && !WIFSIGNALED(status) );
+        #endif
+        if (retVal == -1 && errno == ECHILD){
+            #if DEBUG
+            std::cout << MAGENTA << "[DEBUG] all children done " << GREY << std::endl;
+            #endif
+            break;
+        }
+    }
 
 // std::cout << "...to" << K*procs << std::endl;
 // read normalized vector out of shared memory
@@ -492,11 +497,16 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 csvRow_t pete::util::getRefKey(const std::string rowName){
     csvRow_t ref;
 
-    for( uint32_t i = 0; i < master.size(); i++ ){
+    uint32_t i = 0;
+    for( ; i < master.size(); ){
         if( master[i].fname.compare( rowName ) == 0 ){
             ref = master[i];
             break;
         }
+        else i++;
+    }
+    if( i == master.size() ){
+        throw std::logic_error("[input] bad key\n");
     }
 
     return ref;

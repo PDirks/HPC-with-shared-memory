@@ -9,7 +9,9 @@
 #include <set>
 #include <vector>
 
-#define DEBUG 1
+#define DEBUG               0
+#define BOILER_PLATE_JOIN   0
+#define PROGRESS_FLAG       0
 
 #define BLACK   "\033[0;30m"
 #define RED     "\033[0;31m"
