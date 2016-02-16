@@ -9,7 +9,7 @@
 #include <set>
 #include <vector>
 
-#define DEBUG 0
+#define DEBUG 1
 
 #define BLACK   "\033[0;30m"
 #define RED     "\033[0;31m"

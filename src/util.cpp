@@ -320,46 +320,6 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 
     const csvRow_t reference_vector = master.at(key);
 
-//// ### semaphore setup ###
-    int semId; 			        // ID of semaphore set
-	key_t semKey = 123459; 		// key to pass to semget(), key_t is an IPC key type defined in sys/types
-	int semFlag = IPC_CREAT | 0666; // Flag to create with rw permissions
-	int semCount = 1;    		// number of semaphores to pass to semget()
-	int numOps = 1; 	    	// number of operations to do
-
-	// Create the semaphore
-	// The return value is the semaphore set identifier
-   	if ((semId = semget(semKey, semCount, semFlag)) == -1){
-        #if DEBUG
-   		std::cerr << "\n" << BRED << "[DEBUG] Failed to semget(" << semKey << "," << semCount << "," << semFlag << ")" << GREY <<std::endl;
-        #endif
-		exit(1);
-	}
-	else{
-        #if DEBUG
-   		std::cout << "\n" << CYAN << "[DEBUG] Successful semget resulted in (" << semId << ")" << GREY << std::endl;
-        #endif
-	}
-	// Initialize the semaphore
-	union semun {
-		int val;
-		struct semid_ds *buf;
-		ushort * array;
-	} argument;
-
-	argument.val = 1; // NOTE: We are setting this to one to make it a MUTEX
-	if( semctl(semId, 0, SETVAL, argument) < 0){
-        #if DEBUG
-		std::cerr << BRED << "[DEBUG] Init: Failed to initialize (" << semId << ")" << GREY << std::endl; 
-        #endif
-		exit(1);
-	}
-	else{
-        #if DEBUG
-		std::cout << CYAN << "[DEBUG] Init: Initialized (" << semId << ")" << GREY << std::endl; 
-        #endif
-	}
-
 //// ### shm setup ###
     int shmId; 			// ID of shaBRED memory segment
 	key_t shmKey = 222260; 		// key to pass to shmget(), key_t is an IPC key type defined in sys/types
@@ -413,10 +373,6 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
         #if DEBUG
         std::cout << MAGENTA << "[DEBUG] starting child proc " << unsigned(proc_id) << GREY << std::endl;
         #endif
-		struct sembuf operations[1];    // init sembuf
-		operations[0].sem_num   = 0;
-		operations[0].sem_op    = 1;	// this the operation... the value is added to semaphore (a V-Op = +1)
-		operations[0].sem_flg   = IPC_NOWAIT;	// set to IPC_NOWAIT to allow the calling process to fast-fail
 
         // compute local normal
         const uint32_t size = master.size()-1;
@@ -427,7 +383,12 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
         std::cout << MAGENTA << "[DEBUG] proc " << unsigned(proc_id) << " computing local normal" << "(" << (proc_id + 1) * (size/procs) + 1 << ")" << GREY << std::endl;
         #endif
 
-        for( std::map<uint32_t, csvRow_t>::iterator it = master.begin(); it != master.end(); ++it ){
+        std::map<uint32_t, csvRow_t>::iterator it = master.begin();
+        std::advance(it, (proc_id) * (size/procs));
+        for( ; it != master.end(); ++it ){
+            if( local_index == (size/procs) ){
+                break;
+            }
             // TODO: unroll loop
             float normal_sum = 0;
             for( int i = 0; i < 4096; i++ ){
@@ -436,6 +397,9 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
             
             norm2_t temp_norm = {it->first, normal_sum};
             local_norm[local_index] = temp_norm;
+
+//            std::cout << unsigned(proc_id) << "-> idx: " << local_index << std::endl;
+
             local_index++;
         }// end iterator for
 
@@ -445,51 +409,22 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 
         std::sort( &local_norm[0], &local_norm[local_index-1], norm_sort );
 
+        std::cout << unsigned(proc_id) << "->" <<local_norm[0].normal << ", " << local_norm[1].normal << ", " << local_norm[2].normal << "\n" << std::endl;
+
         // jump to correct block in shared memory
-        shm += proc_id * ( size / procs );    
+        shm += proc_id * K;    
 
-        #if DEBUG
-        std::cout << MAGENTA << "[DEBUG] child proc " << unsigned(proc_id) << " req sem" << GREY << std::endl;
-        #endif
+        std::cout << "[DEBUG] jumped to " << proc_id * K << std::endl;
 
-        int retval = semop(semId, operations, numOps);  // get lock on sem
-		if(0 == retval){
-            #if DEBUG
-            std::cout << MAGENTA << "[DEBUG] child proc " << unsigned(proc_id) << " sem lock" << GREY << std::endl;
-            #endif
-            // store local_norm into shaBRED mem
-            std::copy( local_norm, local_norm+K, shm);    //TODO memcpy or copy??
+        // store local_norm into shaBRED mem
+        std::copy( local_norm, local_norm+K, shm);    //TODO memcpy or copy??
 
-        }// end sem lock
-        else{
-            #if DEBUG
-            std::cerr << BRED << "[DEBUG] In the child (if): Failed P-operation on (" << semId << ")" << GREY << std::endl; 
-            #endif
-			_exit(1);
-        }
-        #if DEBUG
-        std::cout << MAGENTA << "[DEBUG] child proc " << unsigned(proc_id) << " sem unlock" << GREY << std::endl;
-        #endif
-
-        // Release the semaphore (V-op)
-		operations[0].sem_op = 1; 	// this the operation... the value is added to semaphore (a V-Op = 1)
-		retval = semop(semId, operations, numOps);
-		if(0 == retval){
-            #if DEBUG
-			std::cout << CYAN << "[DEBUG]In the child (if): Successful V-operation on (" << semId << ")" << GREY << std::endl; 
-            #endif
-		}
-		else{
-            #if DEBUG
-			std::cerr << BRED <<"In the child (if): Failed V-operation on (" << semId << ")" << GREY << std::endl; 
-            #endif
-		}
         #if DEBUG
         std::cout << MAGENTA << "[DEBUG] ending child proc " << unsigned(proc_id) << GREY << std::endl;
         #endif
 		_exit(0);
     }// END CHILD
-
+// ### PARENT PROC ###
 	int status;	// catch the status of the child
 	do { 
 		pid_t w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
@@ -499,7 +434,7 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
             #endif
 			break;
 		}
-		
+        std::cout << "~~~[DEBUG] wait signal " << w << std::endl;
 		if (WIFEXITED(status)){
 			if (status > 0){
                 #if DEBUG
@@ -535,8 +470,15 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 	}
 	while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
+    #if DEBUG
+    std::cout << MAGENTA << "[DEBUG] all children done " << GREY << std::endl;
+    #endif
+
+
+// std::cout << "...to" << K*procs << std::endl;
 // read normalized vector out of shared memory
-    normalized.assign( shm, shm+K );
+    normalized.assign( shm, shm+(K*procs) );
+    std::sort( normalized.begin(), normalized.end(), norm_sort );
 
 // remove shm!
     shmctl(shmId,IPC_RMID,0);

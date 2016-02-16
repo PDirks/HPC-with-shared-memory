@@ -32,7 +32,7 @@ const std::string fname = "../data/2100_HPC.csv";
 const uint32_t size = 2100;
 const std::string refName = "agricultural/agricultural00.tif";
 const uint32_t K = 25;
-const uint8_t procs = 4;
+const uint8_t procs = 2;
 
 void sanity_check( const std::vector<norm2_t> normalized );
 
@@ -115,6 +115,10 @@ void sanity_check( const std::vector<norm2_t> normalized ){
         1.74639, 1.78687, 1.80131, 1.80849, 1.82537 };
 
     for(int i = 1; i < 25; i ++){
+        #if 1
+        //std::cout << normalized.at(0).normal << ", " << normalized.at(1).normal << ", " << normalized.at(2).normal << std::endl;
+        //std::cout << normalized.at(i).normal << " vs " << sols[i] << std::endl;
+        #endif
         assert( std::abs( normalized.at(i).normal - sols[i] ) < 0.0001 );
     }
 
