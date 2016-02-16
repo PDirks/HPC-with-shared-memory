@@ -46,13 +46,13 @@ int main (void){
     std::cout << std::setfill('=') << std::setw(35) << "=" << std::endl;
 
 ////  ### read test ###
-    std::cout << GREEN << "[TEST] read " << GREY;
+    std::cout << GREEN << "[TEST] read " << GREY << std::flush;
     //std::map<std::string, std::vector<float>> csv_Map = csv_read(fname);
     //assert( csv_Map.size() == size );    
     pete::util csv(fname);
     csv.import();
     #if DEBUG
-    std::cout << "\n" << CYAN << "[DEBUG] size... " << csv.master.size() << "vs" << size << " " << GREY;
+    std::cout << "\n" << CYAN << "[DEBUG] size... " << csv.master.size() << "vs" << size << " " << GREY << std::flush;
     #endif
     assert( csv.master.size() == size );
     std::cout << GREEN << "." << GREY << std::endl;    
@@ -77,7 +77,7 @@ int main (void){
         << std::endl;
 #endif
 //// ### parallel normalize
-    std::cout << GREEN << "[TEST] normalize " << GREY;
+    std::cout << GREEN << "[TEST] normalize " << GREY << std::flush;
 
     std::chrono::high_resolution_clock c;
     std::chrono::high_resolution_clock::time_point start = c.now();
@@ -97,7 +97,7 @@ int main (void){
         << std::endl;
 
 //// ### sanity check ###
-    std::cout << GREEN << "[TEST] sanity check " << GREY;
+    std::cout << GREEN << "[TEST] sanity check " << GREY << std::flush;
     sanity_check(csv.normalized);
     std::cout << GREEN << "." << GREY << std::endl;
 
@@ -116,7 +116,7 @@ void sanity_check( const std::vector<norm2_t> normalized ){
 
     for(int i = 1; i < 25; i ++){
         #if 1
-        //std::cout << normalized.at(0).normal << ", " << normalized.at(1).normal << ", " << normalized.at(2).normal << std::endl;
+        std::cout << normalized.at(0).normal << ", " << normalized.at(1).normal << ", " << normalized.at(2).normal << std::endl;
         //std::cout << normalized.at(i).normal << " vs " << sols[i] << std::endl;
         #endif
         assert( std::abs( normalized.at(i).normal - sols[i] ) < 0.0001 );
