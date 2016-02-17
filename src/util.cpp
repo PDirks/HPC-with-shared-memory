@@ -9,6 +9,7 @@
 #include <cmath>        // std::abs
 #include <cstring>
 #include <exception>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -17,6 +18,7 @@
 #include <vector>
 #include <unistd.h>  // fork
 
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -53,187 +55,6 @@ std::map<std::string, std::vector<float>> csv_read(const std::string file){
     return csvMap;
 }// end csv_read
 
-#if 0
-std::vector<norm_t> normalize(std::map<std::string, std::vector<float>> master, const std::string key, uint8_t procs, uint8_t offset, uint32_t K){
-    
-    // TODO find size function
-    uint32_t size = 2100;
-
-//// ### semaphore setup ###
-    int semId; 			        // ID of semaphore set
-	key_t semKey = 123459; 		// key to pass to semget(), key_t is an IPC key type defined in sys/types
-	int semFlag = IPC_CREAT | 0666; // Flag to create with rw permissions
-
-	int semCount = 1;    		// number of semaphores to pass to semget()
-	int numOps = 1; 	    	// number of operations to do
-	// Create the semaphore
-	// The return value is the semaphore set identifier
-	// The flag is a or'd values of CREATE and ugo permission of RW, 
-	//			just like used for creating a file
-   	if ((semId = semget(semKey, semCount, semFlag)) == -1){
-   		std::cerr << "Failed to semget(" << semKey << "," << semCount << "," << semFlag << ")" << std::endl;
-		exit(1);
-	}
-	else{
-   		std::cout << "Successful semget resulted in (" << semId << std::endl;
-	}
-	// Initialize the semaphore
-	union semun {
-		int val;
-		struct semid_ds *buf;
-		ushort * array;
-	} argument;
-
-	argument.val = 1; // NOTE: We are setting this to one to make it a MUTEX
-	if( semctl(semId, 0, SETVAL, argument) < 0){
-		std::cerr << "Init: Failed to initialize (" << semId << ")" << std::endl; 
-		exit(1);
-	}
-	else{
-		std::cout << "Init: Initialized (" << semId << ")" << std::endl; 
-	}
-
-//// ### shm setup ###
-    int shmId; 			// ID of shaBRED memory segment
-	key_t shmKey = 222260; 		// key to pass to shmget(), key_t is an IPC key type defined in sys/types
-	int shmFlag = IPC_CREAT | 0666; // Flag to create with rw permissions
-	
-	// This will be shaBRED:
-	unsigned long * shm;
-//    std::vector<norm_t> return_norms[procs];
-
-    // shmget() returns the identifier of the shaBRED memory segment associated with the value of the argument key.
-	// A new shaBRED memory segment, with size equal to the value of size rounded up to a multiple of PAGE_SIZE, is
-	// created  if  key has the value IPC_PRIVATE or key isn't IPC_PRIVATE, no shaBRED memory segment corresponding
-	// to key exists, and IPC_CREAT is specified in shmflg.
-    std::cout << "mem size: " << K * procs * (sizeof(long) + 40) << " bytes" << std::endl;
-	if ((shmId = shmget(shmKey, K * procs * (sizeof(long) + 40), shmFlag)) < 0){ // TODO look at shm sizing
-		std::cerr << "Init: Failed to initialize shaBRED memory (" << shmId << ")" << std::endl; 
-		exit(1);
-	}
-    std::cout << "shmId " << shmId << std::endl;
-    // shmat() attaches the shaBRED memory segment identified by shmid to the address space of the calling process.
-    if ((shm = (unsigned long *)shmat(shmId, NULL, 0)) == (unsigned long *) -1){
-		std::cerr << "Init: Failed to attach shaBRED memory (" << shmId << ")" << std::endl; 
-		exit(1);
-	}
-    
-//// ### fork test ###
-    pid_t pid;
-    uint8_t proc_id;
-    for( uint8_t i = 0; i < procs; i++){
-        //std::cout << "[DEBUG] spinning up proc " << std::endl;
-        pid = fork();
-        if( pid == 0 ){
-            proc_id = i - 1;
-            break;
-        }
-    }
-    if( pid < 0 ){
-        std::cerr << "Could not fork!!! ("<< pid <<")" << std::endl;
-		exit(1);
-    }
-
-    if( pid == 0 ){ // CHILD PROC
-		struct sembuf operations[1];    // init sembuf
-		operations[0].sem_num   = 0;
-		operations[0].sem_op    = 1;	// this the operation... the value is added to semaphore (a V-Op = +1)
-		operations[0].sem_flg   = IPC_NOWAIT;	// set to IPC_NOWAIT to allow the calling process to fast-fail
-
-        int retval = semop(semId, operations, numOps);
-
-		if(0 == retval){
-
-            // find shm offset for local child segment...
-            shm += proc_id * (size / procs);
-
-    //// ### NORMALIZE! ###
-
-            std::vector<float> reference_vector = master.at(key);
-            std::vector<norm_t> local_normalized;
-            const uint32_t size = master.size();
-            uint32_t count = 0;
-
-            std::map<std::string, std::vector<float>>::iterator it = master.begin();
-            std::advance( it, offset * (size / procs) );
-            for( ; it != master.end(); ++it ){      // TODO: look into break condition
-                // hacky way to read segments of map
-                if( count >= ((uint32_t)offset + 1) / (uint32_t)procs ){
-                    break;
-                }
-
-                // TODO: unroll loop
-                float normal_sum = 0;
-                for( int i = 0; i < 4096; i++ ){
-                    normal_sum += std::abs(it->second[i] - reference_vector[i]) / size;
-                }// end vector for
-                
-                norm_t temp_norm = {it->first, normal_sum};
-                local_normalized.push_back(temp_norm);
-           }// end iterator for
-
-            // now need to copy local normalized over to shm...
-
-
-
-        }        
-        else{
-            std::cerr << "[DEBUG]In the child (if): Failed P-operation on (" << semId << ")" << std::endl; 
-			_exit(1);
-        }
-
-        // Release the semaphore (V-op)
-		operations[0].sem_op = 1; 	// this the operation... the value is added to semaphore (a V-Op = 1)
-		retval = semop(semId, operations, numOps);
-		if(0 == retval){
-			std::cout << "[DEBUG]In the child (if): Successful V-operation on (" << semId << ")" << std::endl; 
-		}
-		else{
-			std::cerr << "In the child (if): Failed V-operation on (" << semId << ")" << std::endl; 
-		}
-
-		_exit(0);
-    }// end child
-
-	int status;	// catch the status of the child
-	do { 
-		pid_t w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-		if (w == -1){
-			std::cerr << "Error waiting for child process ("<< pid <<")" << std::endl;
-			break;
-		}
-		
-		if (WIFEXITED(status)){
-			if (status > 0){
-				std::cerr << "[DEBUG]Child process ("<< pid <<") exited with non-zero status of " << WEXITSTATUS(status) << std::endl;
-				continue;
-			}
-			else{
-				std::cout << "[DEBUG]Child process ("<< pid <<") exited with status of " << WEXITSTATUS(status) << std::endl;
-				continue;
-			}
-		}
-		else if (WIFSIGNALED(status)){
-			std::cout << "[DEBUG]Child process ("<< pid <<") killed by signal (" << WTERMSIG(status) << ")" << std::endl;
-			continue;			
-		}
-		else if (WIFSTOPPED(status)){
-			std::cout << "[DEBUG]Child process ("<< pid <<") stopped by signal (" << WSTOPSIG(status) << ")" << std::endl;
-			continue;			
-		}
-		else if (WIFCONTINUED(status)){
-			std::cout << "[DEBUG]Child process ("<< pid <<") continued" << std::endl;
-			continue;
-		}
-	}
-	while (!WIFEXITED(status) && !WIFSIGNALED(status));
-
-    std::vector<norm_t> normalized;
-
-    return normalized;
-}// normalize
-#endif
-
 std::vector<norm_t> normalize(std::map<std::string, std::vector<float>> master, const std::string key){
     std::vector<float> reference_vector = master.at(key);
     std::vector<norm_t> normalized;
@@ -249,9 +70,6 @@ std::vector<norm_t> normalize(std::map<std::string, std::vector<float>> master, 
         norm_t temp_norm = {it->first, normal_sum};
         normalized.push_back(temp_norm);
    }// end iterator for
-
-    
-
     return normalized;
 }// normalize
 
@@ -269,11 +87,12 @@ void print_norm(const std::vector<norm_t> normalized, const uint32_t K ){
     }
 }
 
-pete::util::util( std::string f ){
-    file = f;
-}
+pete::util::util( std::string f ){ file = f; }
 pete::util::~util(){;}
 
+/*
+ * import with getline! It's not fast! Boo!
+ **/
 void pete::util::import(){
     char *toks;
     std::string temp_fname;
@@ -301,6 +120,88 @@ void pete::util::import(){
     }
 }// end csv_read
 
+/*
+ * import with mmap! It's fast! Yay!
+ **/
+void pete::util::import2(){
+
+    std::ifstream in( file.c_str(), std::ifstream::ate | std::ifstream::binary );
+    size_t filesize = in.tellg();
+    
+    int fd = open( file.c_str(), O_RDONLY, 0);  // open file
+    assert( fd != -1 );
+
+    //Execute mmap
+
+/*  flags used for mmap...
+ *      PROT_READ   - read-only page protection
+ *      MAP_PRIVATE - don't write changes to the file (redundant as file was open as O_RDONLY)
+ *      MAP_POPULATE- kernel will repopulate file
+ **/
+    mmappedData = (uint8_t *)mmap(NULL, filesize, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
+    assert(mmappedData != MAP_FAILED);
+
+    dataBlock = (uint8_t *)calloc( filesize*2, sizeof(uint8_t) );
+
+    uint32_t start = 0;
+    uint32_t end = 0;
+    uint32_t row_count = 0;
+    std::string rowRaw;
+    uint8_t rowStart = 1;
+    uint32_t dataBlock_offset = 0;
+    float temp = 0;
+
+    while( end < filesize ){
+        if( mmappedData[end] == ',' ){
+            if( rowStart == 1 ){
+                rowRaw.assign((char *)&mmappedData[start], end-start);              
+//                std::cout << start << " _ " << end <<" file: " << rowRaw << std::endl;
+                blockIndex[rowRaw] = row_count;
+                rowStart = 0;
+                //end++;
+            }
+            else if( rowStart == 0 ){
+                rowRaw.assign( (char *)mmappedData+start, end-start );
+                temp = atof(rowRaw.c_str());
+                memcpy( &dataBlock[dataBlock_offset], &temp, sizeof(float) );
+            
+                #if DEBUG
+                if( row_count == 1 )
+                std::cout << " adding " << temp << " to offset " << dataBlock_offset << std::endl;
+                #endif
+                dataBlock_offset += sizeof(float);
+            }
+            start = ++end;
+        }
+        else if( mmappedData[end] == '\n' ){
+            rowRaw.assign( (char *)mmappedData+start, end-start );
+            temp = atof(rowRaw.c_str());
+            memcpy( &dataBlock[dataBlock_offset], &temp, sizeof(float) );
+            row_count++;
+            start = ++end;
+
+            #if DEBUG
+            std::cout << " adding " << temp << " to offset " << dataBlock_offset << std::endl;
+            #endif
+
+            dataBlock_offset += sizeof(float);
+            rowStart = 1;
+        }
+        else{
+            end++;
+        }
+    }
+
+//    std::string rowRaw( (char *)mmappedData, 100 );
+//    std::cout << "[0]" << rowRaw << std::endl;
+    
+    //Cleanup
+    int rc = munmap(mmappedData, filesize);
+    assert(rc == 0);
+
+
+}// end import2
+
 void pete::util::normalize(const uint32_t key){
     csvRow_t reference_vector = master.at(key);
     const uint32_t size = master.size()-1;
@@ -318,8 +219,6 @@ void pete::util::normalize(const uint32_t key){
 }// normalize
 
 void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , const uint8_t procs ){
-
-    std::cout << "key: " << unsigned(key) << std::endl;
     const csvRow_t reference_vector = master.at(key);
 
 //// ### shm setup ###

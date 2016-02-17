@@ -5,13 +5,19 @@
  * util.hpp
  **/
 #include <map>
-#include <string>
 #include <set>
+#include <stdlib.h> // abort
+#include <stdio.h>  // fflush
+#include <string>
 #include <vector>
 
 #define DEBUG               0
 #define BOILER_PLATE_JOIN   0
 #define PROGRESS_FLAG       0
+
+#define assert(e) if((e) != true){ \
+                   fprintf(stderr,"%s,%d: assertion '%s' failed\n",__FILE__, __LINE__, #e); \
+                   fflush(stderr); fflush(stdout); abort();}
 
 #define BLACK   "\033[0;30m"
 #define RED     "\033[0;31m"
@@ -50,6 +56,11 @@ namespace pete{
 
 class util{
     public:
+        std::map<std::string, uint32_t> blockIndex;
+
+        uint8_t *mmappedData;
+        uint8_t *dataBlock;
+
         std::string file;
         std::map<uint32_t, csvRow_t> master ;  
 
@@ -59,6 +70,7 @@ class util{
         ~util();
         
         void import();
+        void import2();
         void normalize(const uint32_t key);
         void parallel_normalize( const uint32_t key, const uint32_t K , const uint8_t procs );
         csvRow_t getRefKey(const std::string rowName);

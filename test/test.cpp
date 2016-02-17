@@ -23,18 +23,14 @@
 
 #include "../src/util.cpp"
 
-#define assert(e) if((e) != true){ \
-                   fprintf(stderr,"%s,%d: assertion '%s' failed\n",__FILE__, __LINE__, #e); \
-                   fflush(stderr); fflush(stdout); abort();}
-
-
-const std::string fname = "../data/6300_HPC.csv";
-const uint32_t size = 6300;
+const std::string fname = "../data/2100_HPC.csv";
+const uint32_t size = 2100;
 const std::string refName = "agricultural/agricultural00.tif";
 const uint32_t K = 25;
 const uint8_t procs = 1;
 
 void sanity_check( const std::vector<norm2_t> normalized );
+void sanity_check2( uint8_t *dataBlock );
 
 int main (void){
 
@@ -45,11 +41,18 @@ int main (void){
         << "\n/ fname: " << fname << std::endl;
     std::cout << std::setfill('=') << std::setw(35) << "=" << std::endl;
 
+    pete::util csv(fname);
 ////  ### read test ###
-    std::cout << GREEN << "[TEST] read " << GREY << std::flush;
+
+    std::cout << GREEN << "[TEST] read 1/2 " << GREY << std::flush;    
+    csv.import2();
+    std::cout << GREEN << "." << GREY << std::endl;    
+    sanity_check2(csv.dataBlock);
+    return 0;
+    std::cout << GREEN << "[TEST] read 2/2 " << GREY << std::flush;
     //std::map<std::string, std::vector<float>> csv_Map = csv_read(fname);
     //assert( csv_Map.size() == size );    
-    pete::util csv(fname);
+    
     csv.import();
     #if DEBUG
     std::cout << "\n" << CYAN << "[DEBUG] size... " << csv.master.size() << "vs" << size << " " << GREY << std::flush;
@@ -114,13 +117,48 @@ void sanity_check( const std::vector<norm2_t> normalized ){
         1.52222, 1.53879, 1.57182, 1.5952, 1.64235, 1.64909, 1.64935, 1.71369, 1.71775, 1.73443,
         1.74639, 1.78687, 1.80131, 1.80849, 1.82537 };
 
-    for(int i = 1; i < 25; i ++){
+    for(int i = 1; i < 25; i++){
         #if DEBUG
         //std::cout << normalized.at(0).normal << ", " << normalized.at(1).normal << ", " << normalized.at(2).normal << std::endl;
         std::cout << "[DEBUG] sanity check: " << normalized.at(i).normal << " vs " << sols[i] << std::endl;
         #endif
         assert( std::abs( normalized.at(i).normal - sols[i] ) < 0.0001 );
     }
+}// end sanity_check
 
-}
+void sanity_check2( uint8_t *dataBlock ){
+
+    float sols[] = {0,0,1.36346,0,0,1.72232,0,0,0};
+    for(int i = 0; i < 3; i++){
+        float tempf = 0;
+
+        memcpy( &tempf, &dataBlock[ (4097 * i) ], sizeof(float) );
+        #if DEBUG
+        std::cout << "[" << i*3 << "] -> " 
+            << tempf
+            << " (" << (4097 * i)*4 << ") "
+            << std::endl;
+        #endif
+        assert(std::abs( tempf - sols[i*3] ) < 0.0001);
+
+        memcpy( &tempf, &dataBlock[ (4097 * i)*4 + 4 ], sizeof(float) );
+        #if DEBUG
+        std::cout << "[" << i*3+1 << "] -> " 
+            << tempf
+            << " (" << (4097 * i)*4 + 4 << ") "
+            << std::endl;
+        #endif
+        assert(std::abs( tempf - sols[i*3+1]) < 0.0001);
+
+        memcpy( &tempf, &dataBlock[ (4097 * i)*4 + 8 ], sizeof(float) );
+        #if DEBUG
+        std::cout << "[" << i*3+2 << "] -> " 
+            << tempf
+            << " (" << (4097 * i)*4 + 8 << ") "
+            << std::endl;
+        #endif
+        assert(std::abs( tempf - sols[i*3+2]) < 0.0001);
+    }
+
+}// end sanity_check2
 
