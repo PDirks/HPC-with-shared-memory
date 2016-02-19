@@ -101,23 +101,23 @@ int main(int argc, char * argv[]){
  *  ###  Output  ###
  */
     std::cout << BGREY << "### HW2 REPORT ###" << GREY << std::endl;
-    std::cout << "/ " << std::setfill('-') << std::setw(75) << "=" << std::endl;
+    std::cout << "/ " << std::setfill('=') << std::setw(75) << "=" << std::flush;
     std::cout << GREY << "\n/ K: " << BRED << K 
         << GREY << "\n/ procs: " << BRED << unsigned(procs) 
         << GREY << "\n/ fname: " << BRED << file
         << GREY << "\n/ pattern:" << BRED << pattern
-        << GREY << "\n/\n/ read avg: " << BRED << " sec" << read_avg
-        << GREY << "\n/ calc avg: " << BRED << " sec" << calc_avg 
-        << GREY << std::endl;
+        << GREY << "\n/\n/ read avg: " << BRED << read_avg << " sec"
+        << GREY << "\n/ calc avg: " << BRED << calc_avg 
+        << " sec" << GREY << std::endl;
 
     std::cout << "/\n/ [index] [filename] [L1-Norm]" << std::endl;
     std::cout << "/ " << std::setfill('-') << std::setw(55) << "-" << std::endl;
     for( uint32_t i = 0; i < K; i++ ){
         std::cout << GREY << "/ "
             << " [" << i << "]" << " | "
-            << csv.revBlockIndex[csv.normalized.at(1).row]
+            << csv.revBlockIndex[csv.normalized.at(i).row]
             << " | "
-            << csv.normalized.at(1).normal
+            << csv.normalized.at(i).normal
             << GREY << std::endl;
     }
     std::cout << "/ " << std::setfill('-') << std::setw(58) << "-" << std::endl;
