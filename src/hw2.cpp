@@ -80,8 +80,6 @@ int main(int argc, char * argv[]){
     }
     read_avg /= AVG;
 
-    std::cout << "read done" << std::endl;
-
 /*
  *  ###  Calculate & Sort  ###
  */
