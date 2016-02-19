@@ -34,6 +34,8 @@
 #define BCYAN   "\033[1;36m"
 #define BGREY   "\033[1;37m"
 
+#define ROWSIZE (sizeof(float) * 4097)
+
 typedef struct {
     std::string fname;
     uint32_t row;
@@ -57,9 +59,13 @@ namespace pete{
 class util{
     public:
         std::map<std::string, uint32_t> blockIndex;
+        std::vector<std::string> revBlockIndex;
 
         uint8_t *mmappedData;
         uint8_t *dataBlock;
+
+        uint32_t row_count;
+        uint32_t rawFloatCount;
 
         std::string file;
         std::map<uint32_t, csvRow_t> master ;  
@@ -73,7 +79,9 @@ class util{
         void import2();
         void normalize(const uint32_t key);
         void parallel_normalize( const uint32_t key, const uint32_t K , const uint8_t procs );
+        void parallel_block_normalize( const uint32_t key, const uint32_t K , const uint8_t procs );
         csvRow_t getRefKey(const std::string rowName);
+        uint32_t getRefKey2(const std::string rowName);
 };
 }; // end namespace pete
 

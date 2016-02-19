@@ -21,7 +21,11 @@
 //#include "../include/util.hpp"
 #include "../src/util.cpp"
 
-#define AVG 10
+#define AVG 1
+
+/*
+ ./pld9bc_hw2_main "intersection/intersection25_rot_000.tif" "../data/8400_HPC.csv" 25 2
+*/
 
 int main(int argc, char * argv[]){
 
@@ -64,7 +68,8 @@ int main(int argc, char * argv[]){
     double read_avg = 0;
     for( int i = 0; i < AVG; i++){
         start = c.now();
-        csv.import();
+//        csv.import();
+        csv.import2();
         stop = c.now();
         read_avg += (double) (std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count())/ 1000000;
         #if PROGRESS_FLAG        
@@ -75,18 +80,20 @@ int main(int argc, char * argv[]){
     }
     read_avg /= AVG;
 
+    std::cout << "read done" << std::endl;
+
 /*
  *  ###  Calculate & Sort  ###
  */
     double calc_avg = 0;
     for( int i = 0; i < AVG; i++){
         start = c.now();
-        csv.parallel_normalize( csv.getRefKey(pattern).row, K , procs );
+        csv.parallel_block_normalize( csv.getRefKey2(pattern), K , procs );
         stop = c.now();
         calc_avg += (double) (std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()) / 1000000;
-        #if PROGRESS_FLAG        
-        if( i % 10 == 0 ){
-            std::cout << "." << std::flush;
+        #if PROGRESS_FLAG       
+        if( i % 1 == 0 ){
+            std::cout << "," << std::flush;
         }
         #endif
     }
@@ -96,15 +103,27 @@ int main(int argc, char * argv[]){
  *  ###  Output  ###
  */
     std::cout << BGREY << "### HW2 REPORT ###" << GREY << std::endl;
-    std::cout << std::setfill('=') << std::setw(35) << "=" << std::endl;
+    std::cout << BGREY << std::setfill('=') << std::setw(75) << "=" << GREY << std::endl;
     std::cout << GREY << "/ K: " << BRED << K 
         << GREY << "\n/ procs: " << BRED << unsigned(procs) 
         << GREY << "\n/ fname: " << BRED << file
         << GREY << "\n/ pattern:" << BRED << pattern
         << GREY << "\n/\n/ read avg: " << BRED << read_avg
-        << GREY << "\n/ calc avg: " << BRED << calc_avg
+        << GREY << "\n/ calc avg: " << BRED << calc_avg 
         << GREY << std::endl;
-    std::cout << std::setfill('=') << std::setw(35) << "=" << std::endl;
+
+    std::cout << "/\n/ [index] [filename] [L1-Norm]" << std::endl;
+    std::cout << "/ " << std::setfill('-') << std::setw(55) << "-" << std::endl;
+    for( uint32_t i = 0; i < K; i++ ){
+        std::cout << GREY << "/  [" << i << "] | "
+            << csv.revBlockIndex[csv.normalized.at(1).row]
+            << " | "
+            << csv.normalized.at(1).normal
+            << GREY << std::endl;
+    }
+    std::cout << "/ " << std::setfill('-') << std::setw(58) << "-" << std::endl;
+    std::cout << "/ " << std::endl;
+    std::cout << "/ " << BGREY << std::setfill('=') << std::setw(75) << "=" << GREY << std::endl;
 
 /*
  *  ###  Cleanup  ###
@@ -112,9 +131,9 @@ int main(int argc, char * argv[]){
     /*
     for(int i = csv.size-1; i != 0; i-- ){
         delete csv[i];
-    }
-    delete csv;
-    */
+    }*/
+    //delete csv;
+    
 
     return 0;
 }// end main
