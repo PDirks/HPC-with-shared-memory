@@ -16,7 +16,7 @@
 #include <set>
 #include <string>
 #include <vector>
-#include <unistd.h>  // fork
+#include <unistd.h>  // fork, read, open, close
 
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -125,7 +125,7 @@ void pete::util::import(){
 }// end csv_read
 
 /*
- * import with mmap! It's fast! Yay!
+ * import with read()! It's fast! Yay!
  **/
 void pete::util::import2(){
 
@@ -142,9 +142,15 @@ void pete::util::import2(){
  *      MAP_PRIVATE - don't write changes to the file (redundant as file was open as O_RDONLY)
  *      MAP_POPULATE- kernel will repopulate file
  **/
+#if MMAP
     mmappedData = (uint8_t *)mmap(NULL, filesize, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
     assert(mmappedData != MAP_FAILED);
-
+#endif
+#if !MMAP
+    int filedesc = open("testfile.txt", O_RDONLY);
+    if( filedesc < 0 ){}
+    uint8_t *rawBlock = (uint8_t *)calloc( sizeof(uint8_t), filesize );
+#endif
     dataBlock = (uint8_t *)calloc( filesize*2, sizeof(uint8_t) );
 
     uint32_t start = 0;
@@ -156,17 +162,36 @@ void pete::util::import2(){
     float temp = 0;
 
     while( end < filesize ){
+#if MMAP
         if( mmappedData[end] == ',' ){
+#endif
+#if !MMAP
+        if( rawBlock[end] == ',' ){
+#endif
             if( rowStart == 1 ){
+
+#if MMAP
                 rowRaw.assign((char *)&mmappedData[start], end-start);              
-//                std::cout << start << " _ " << end <<" file: " << rowRaw << std::endl;
+#endif
+#if !MMAP
+                if(read( start, rawBlock, end-start) < 0 ){}
+                rowRaw = "";
+                rowRaw.copy( (char *)rawBlock, end-start, 0 );
+#endif
                 blockIndex[rowRaw] = row_count;
                 revBlockIndex.push_back(rowRaw);
                 rowStart = 0;
                 //end++;
             }
             else if( rowStart == 0 ){
+#if MMAP
                 rowRaw.assign( (char *)mmappedData+start, end-start );
+#endif
+#if !MMAP
+                if(read( start, rawBlock, end-start) < 0 ){}
+                rowRaw = "";
+                rowRaw.copy( (char *)rawBlock, end-start, 0 );
+#endif
                 temp = atof(rowRaw.c_str());
                 memcpy( &dataBlock[dataBlock_offset], &temp, sizeof(float) );
                 rawFloatCount++;
@@ -178,8 +203,16 @@ void pete::util::import2(){
             }
             start = ++end;
         }
+#if MMAP
         else if( mmappedData[end] == '\n' ){
             rowRaw.assign( (char *)mmappedData+start, end-start );
+#endif
+#if !MMAP
+        else if( rawBlock[end] == '\n' ){
+            if(read( start, rawBlock, end-start) < 0 ){}
+            rowRaw = "";
+            rowRaw.copy( (char *)rawBlock, end-start, 0 );
+#endif
             temp = atof(rowRaw.c_str());
             memcpy( &dataBlock[dataBlock_offset], &temp, sizeof(float) );
             row_count++;
@@ -201,9 +234,15 @@ void pete::util::import2(){
 //    std::cout << "[0]" << rowRaw << std::endl;
     
     //Cleanup
+
+#if MMAP
     int rc = munmap(mmappedData, filesize);
     assert(rc == 0);
-
+#endif
+#if !MMAP
+    if( close(filedesc) < 0 ){}
+    free(rawBlock);
+#endif
 
 }// end import2
 

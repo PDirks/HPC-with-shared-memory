@@ -15,6 +15,7 @@
 #define BOILER_PLATE_JOIN   0
 #define PROGRESS_FLAG       0
 #define SIMPLE              0
+#define MMAP                0
 
 #define assert(e) if((e) != true){ \
                    fprintf(stderr,"%s,%d: assertion '%s' failed\n",__FILE__, __LINE__, #e); \
