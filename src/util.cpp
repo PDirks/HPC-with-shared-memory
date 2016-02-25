@@ -131,10 +131,11 @@ void pete::util::import2(){
 
     std::ifstream in( file.c_str(), std::ifstream::ate | std::ifstream::binary );
     size_t filesize = in.tellg();
-    
+
+#if MMAP
     int fd = open( file.c_str(), O_RDONLY, 0);  // open file
     assert( fd != -1 );
-
+#endif
     //Execute mmap
 
 /*  flags used for mmap...
@@ -145,11 +146,18 @@ void pete::util::import2(){
 #if MMAP
     mmappedData = (uint8_t *)mmap(NULL, filesize, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
     assert(mmappedData != MAP_FAILED);
-#endif
-#if !MMAP
-    int filedesc = open("testfile.txt", O_RDONLY);
-    if( filedesc < 0 ){}
+#else
+    int filedesc = open(file.c_str(), O_RDONLY, 0);
+    if( filedesc < 0 ){
+        std::cerr << BRED << "[DEBUG] error on file open" << GREY << std::endl;
+    }
     uint8_t *rawBlock = (uint8_t *)calloc( sizeof(uint8_t), filesize );
+    if( !rawBlock ){
+        std::cerr << BRED << "[DEBUG] error on calloc" << GREY << std::endl;
+    }
+    if(read( filedesc, rawBlock, filesize) < 0 ){
+        std::cerr << BRED << "[DEBUG] error on file read" << GREY << std::endl;
+    }
 #endif
     dataBlock = (uint8_t *)calloc( filesize*2, sizeof(uint8_t) );
 
@@ -160,24 +168,20 @@ void pete::util::import2(){
     uint8_t rowStart = 1;
     uint32_t dataBlock_offset = 0;
     float temp = 0;
-
     while( end < filesize ){
 #if MMAP
         if( mmappedData[end] == ',' ){
-#endif
-#if !MMAP
+#else
         if( rawBlock[end] == ',' ){
 #endif
             if( rowStart == 1 ){
 
 #if MMAP
                 rowRaw.assign((char *)&mmappedData[start], end-start);              
+#else
+                rowRaw.assign( (char *)&rawBlock[start], end-start );
 #endif
-#if !MMAP
-                if(read( start, rawBlock, end-start) < 0 ){}
-                rowRaw = "";
-                rowRaw.copy( (char *)rawBlock, end-start, 0 );
-#endif
+
                 blockIndex[rowRaw] = row_count;
                 revBlockIndex.push_back(rowRaw);
                 rowStart = 0;
@@ -186,18 +190,20 @@ void pete::util::import2(){
             else if( rowStart == 0 ){
 #if MMAP
                 rowRaw.assign( (char *)mmappedData+start, end-start );
+#else
+                rowRaw.assign( (char *)&rawBlock[start], end-start );
 #endif
-#if !MMAP
-                if(read( start, rawBlock, end-start) < 0 ){}
-                rowRaw = "";
-                rowRaw.copy( (char *)rawBlock, end-start, 0 );
-#endif
+    
+
                 temp = atof(rowRaw.c_str());
                 memcpy( &dataBlock[dataBlock_offset], &temp, sizeof(float) );
                 rawFloatCount++;
                 #if DEBUG
-/*                if( row_count+1 == 4501 )
-                std::cout << " adding " << temp << " to offset " << dataBlock_offset/sizeof(float) << " (" << (dataBlock_offset % (4097*sizeof(float)))/sizeof(float) << ")" << std::endl;*/
+                if( row_count+1 == 4501 )
+                std::cout << " adding " << temp << 
+                    " to offset " << dataBlock_offset/sizeof(float) << 
+                    " (" << (dataBlock_offset % (4097*sizeof(float)))/sizeof(float) <<
+                    ")" << std::endl;
                 #endif
                 dataBlock_offset += sizeof(float);
             }
@@ -206,13 +212,11 @@ void pete::util::import2(){
 #if MMAP
         else if( mmappedData[end] == '\n' ){
             rowRaw.assign( (char *)mmappedData+start, end-start );
-#endif
-#if !MMAP
+#else
         else if( rawBlock[end] == '\n' ){
-            if(read( start, rawBlock, end-start) < 0 ){}
-            rowRaw = "";
-            rowRaw.copy( (char *)rawBlock, end-start, 0 );
+            rowRaw.assign( (char *)&rawBlock[start], end-start );
 #endif
+
             temp = atof(rowRaw.c_str());
             memcpy( &dataBlock[dataBlock_offset], &temp, sizeof(float) );
             row_count++;
@@ -238,8 +242,7 @@ void pete::util::import2(){
 #if MMAP
     int rc = munmap(mmappedData, filesize);
     assert(rc == 0);
-#endif
-#if !MMAP
+#else
     if( close(filedesc) < 0 ){}
     free(rawBlock);
 #endif
@@ -310,17 +313,17 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
         }
     }
     if( pid < 0 ){
-        #if DEBUG
+//        #if DEBUG
         std::cerr << BRED << "[DEBUG] Could not fork!!! ("<< pid <<")" << GREY << std::endl;
-        #endif
+//        #endif
 		exit(1);
     }
 
 // ### CHILD PROC ###
     if( pid == 0 ){
-        #if DEBUG
+//        #if DEBUG
         std::cout << MAGENTA << "[DEBUG] starting child proc " << unsigned(proc_id) << ", " << GREY << std::endl;
-        #endif
+//        #endif
 
         // compute local normal
         const uint32_t size = master.size()-1;
@@ -385,7 +388,6 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
         }
     }
 
-// std::cout << "...to" << K*procs << std::endl;
 // read normalized vector out of shared memory
     normalized.assign( shm, shm+(K*procs) );
 //    std::sort( normalized.begin(), normalized.end(), norm_sort );
