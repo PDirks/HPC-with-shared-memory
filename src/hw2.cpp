@@ -113,12 +113,22 @@ int main(int argc, char * argv[]){
     std::cout << "/\n/ [index] [filename] [L1-Norm]" << std::endl;
     std::cout << "/ " << std::setfill('-') << std::setw(55) << "-" << std::endl;
     for( uint32_t i = 0; i < K; i++ ){
-        std::cout << GREY << "/ "
-            << " [" << i << "]" << " | "
-            << csv.revBlockIndex[csv.normalized.at(i).row]
-            << " | "
-            << csv.normalized.at(i).normal
-            << GREY << std::endl;
+        if( i < 10 ){
+            std::cout << GREY << "/ "
+                << " [" << i << "]  | "
+                << csv.revBlockIndex[csv.normalized.at(i).row]
+                << " | "
+                << csv.normalized.at(i).normal
+                << GREY << std::endl;
+        }
+        else{
+            std::cout << GREY << "/ "
+                << " [" << i << "] | "
+                << csv.revBlockIndex[csv.normalized.at(i).row]
+                << " | "
+                << csv.normalized.at(i).normal
+                << GREY << std::endl;
+        }
     }
     std::cout << "/ " << std::setfill('-') << std::setw(58) << "-" << std::endl;
     std::cout << "/ " << std::endl;

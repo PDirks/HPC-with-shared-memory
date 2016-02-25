@@ -5,7 +5,7 @@
  * util.cpp
  **/
 
-#include <algorithm>    // std::sort
+#include <algorithm>    // std::sort, std::partial_sort
 #include <cmath>        // std::abs
 #include <cstring>
 #include <exception>
@@ -92,7 +92,7 @@ pete::util::util( std::string f ){
     rawFloatCount = 0; 
 }
 pete::util::~util(){
-    free( dataBlock );
+//    free( dataBlock );
 }
 
 /*
@@ -100,8 +100,7 @@ pete::util::~util(){
  **/
 void pete::util::import(){
     char *toks;
-    std::string temp_fname;
-    std::string line;
+    std::string temp_fname, line;
     std::ifstream fin   ( file, std::ifstream::in );
     uint32_t cnt = 0;
     if(fin.is_open()){
@@ -315,7 +314,8 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
         std::cout << MAGENTA << "[DEBUG] proc " << unsigned(proc_id) << " computing done" << GREY << std::endl;
         #endif
 
-        std::sort( &local_norm[0], &local_norm[local_index-1], norm_sort );
+//        std::sort( &local_norm[0], &local_norm[local_index-1], norm_sort );
+        std::partial_sort( &local_norm[0], &local_norm[0]+K, &local_norm[local_index-1], norm_sort );
 
         // jump to correct block in shared memory
         shm += proc_id * K;    
@@ -391,7 +391,8 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
 // std::cout << "...to" << K*procs << std::endl;
 // read normalized vector out of shared memory
     normalized.assign( shm, shm+(K*procs) );
-    std::sort( normalized.begin(), normalized.end(), norm_sort );
+//    std::sort( normalized.begin(), normalized.end(), norm_sort );
+    std::partial_sort( normalized.begin(), normalized.begin()+K, normalized.end(), norm_sort );
 
 // remove shm!
     shmctl(shmId,IPC_RMID,0);

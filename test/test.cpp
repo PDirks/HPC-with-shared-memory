@@ -25,9 +25,10 @@
 
 const std::string fname = "../data/8400_HPC.csv";
 const uint32_t size = 8400;
-const std::string refName = "intersection/intersection25_rot_000.tif";
+//const std::string refName = "intersection/intersection25_rot_000.tif";
+const std::string refName = "agricultural/agricultural00_rot_000.tif";
 const uint32_t ref_line = 4501;
-const uint32_t K = 250;
+const uint32_t K = 25;
 const uint8_t procs = 1;
 
 void sanity_check( const std::vector<norm2_t> normalized );
@@ -42,24 +43,18 @@ int main (void){
 
     std::cout << BGREY << "### HW2 tests ###" << GREY << std::endl;
     std::cout << std::setfill('=') << std::setw(35) << "=" << std::endl;
-    std::cout << "/ K: " << K 
-        << "\n/ procs: " << unsigned(procs) 
-        << "\n/ fname: " << fname << std::endl;
+    std::cout << "/ K: " << BRED<< K << GREY
+        << "\n/ procs: " << BRED << unsigned(procs) << GREY
+        << "\n/ refName: " << BRED << refName << GREY
+        << "\n/ fname: " << BRED << fname << GREY << std::endl;
     std::cout << std::setfill('=') << std::setw(35) << "=" << std::endl;
 
     pete::util csv(fname);
 ////  ### read test ###
 
-    std::cout << GREEN << "[TEST] read 1/2 " << GREY << std::flush;
-    start = c.now();   
-    csv.import2();
-    stop = c.now();
-    std::cout << GREEN << ". (" 
-        << (double) (std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()) / 1000000  
-        << " sec)"<< GREY << std::endl;    
+#if SIMPLE
 //    sanity_check2(csv.dataBlock);
-    /*
-    std::cout << GREEN << "[TEST] read 2/2 " << GREY << std::flush;
+    std::cout << GREEN << "[TEST] import1 " << GREY << std::flush;
     //std::map<std::string, std::vector<float>> csv_Map = csv_read(fname);
     //assert( csv_Map.size() == size );    
     
@@ -69,17 +64,25 @@ int main (void){
     #endif
     assert( csv.master.size() == size );
     std::cout << GREEN << "." << GREY << std::endl;    
-    */
+#endif
+
+#if !SIMPLE
+    std::cout << GREEN << "[TEST] import2 " << GREY << std::flush;
+    start = c.now();   
+    csv.import2();
+    stop = c.now();
+    std::cout << GREEN << ". (" 
+        << (double) (std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()) / 1000000  
+        << " sec)"<< GREY << std::endl;    
+#endif
+
 //// ### normalize test ###
-#if 0
-    std::cout << GREEN << "[TEST] normalize " << GREY;
+#if SIMPLE
+    std::cout << GREEN << "[TEST] normalize1 " << GREY;
 
-    std::chrono::high_resolution_clock c;
-    std::chrono::high_resolution_clock::time_point start = c.now();
-
+    start = c.now();
     csv.normalize( csv.getRefKey(refName).row );
-
-    std::chrono::high_resolution_clock::time_point stop = c.now();
+    stop = c.now();
 
     assert( csv.normalized.at(0).normal == 0 );
     std::sort( csv.normalized.begin(), csv.normalized.end(), norm_sort );
@@ -89,12 +92,11 @@ int main (void){
         << " sec)" << GREY
         << std::endl;
 #endif
+#if !SIMPLE
 //// ### parallel normalize
-    std::cout << GREEN << "[TEST] normalize " << GREY << std::flush;
+    std::cout << GREEN << "[TEST] normalize2 " << GREY << std::flush;
 
     start = c.now();
-    //csv.parallel_normalize( csv.getRefKey(refName).row, K , procs );
-    //csv.parallel_block_normalize( csv.getRefKey(refName).row, K , procs );
     csv.parallel_block_normalize( ref_line, K , procs );
     stop = c.now();
 
@@ -106,7 +108,7 @@ int main (void){
         << (double) (std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count()) / 1000000 
         << " sec)" << GREY
         << std::endl;
-
+#endif
 //// ### sanity check ###
     std::cout << GREEN << "[TEST] sanity check " << GREY << std::flush;
 //    sanity_check(csv.normalized);
