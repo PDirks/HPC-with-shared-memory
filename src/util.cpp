@@ -372,58 +372,16 @@ void pete::util::parallel_normalize( const uint32_t key, const uint32_t K , cons
     int status;	// catch the status of the child
     #endif
 
-    while (true){
-        siginfo_t exit_info;
-        int retVal = waitid(P_ALL, -1, &exit_info, WEXITED);
-        #if BOILER_PLATE_JOIN
-        do { 
-	        pid_t w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-	        if (w == -1){
-                #if DEBUG
-		        std::cerr << BRED << "[DEBUG] Error waiting for child process ("<< pid <<")" << GREY << std::endl;
-                #endif
-		        break;
-	        }
-	        if (WIFEXITED(status)){
-		        if (status > 0){
-                    #if DEBUG
-			        std::cerr << CYAN << "[DEBUG] Child process ("<< pid <<") exited with non-zero status of " << WEXITSTATUS(status) << GREY << std::endl;
-                    #endif
-			        continue;
-		        }
-		        else{
-                    #if DEBUG
-			        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") exited with status of " << WEXITSTATUS(status) << GREY << std::endl;
-                    #endif
-			        continue;
-		        }
-	        }
-	        else if (WIFSIGNALED(status)){
-                #if DEBUG
-		        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") killed by signal (" << WTERMSIG(status) << ")" << GREY << std::endl;
-                #endif
-		        continue;			
-	        }
-	        else if (WIFSTOPPED(status)){
-                #if DEBUG
-		        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") stopped by signal (" << WSTOPSIG(status) << ")" << GREY << std::endl;
-                #endif
-		        continue;			
-	        }
-	        else if (WIFCONTINUED(status)){
-                #if DEBUG
-		        std::cout << CYAN << "[DEBUG] Child process ("<< pid <<") continued" << GREY << std::endl;
-                #endif
-		        continue;
-	        }
-        }
-        while (!WIFEXITED(status) && !WIFSIGNALED(status) );
-        #endif
-        if (retVal == -1 && errno == ECHILD){
-            #if DEBUG
-            std::cout << MAGENTA << "[DEBUG] all children done " << GREY << std::endl;
-            #endif
-            break;
+    while (true) {
+        int status;
+        pid_t done = wait(&status);
+        if (done == -1) {
+            if (errno == ECHILD) break; // no more child processes
+        } else {
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+                std::cerr << "pid " << done << " failed" << std::endl;
+                exit(1);
+            }
         }
     }
 
