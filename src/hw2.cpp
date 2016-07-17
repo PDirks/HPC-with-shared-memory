@@ -24,6 +24,9 @@
 #define AVG 1
 
 /*
+ * file input: [string to match against] [file to load] [K] [# procs]
+
+ example command:
  ./pld9bc_hw2_main "intersection/intersection25_rot_000.tif" "../data/8400_HPC.csv" 25 2
 */
 
@@ -32,9 +35,6 @@ int main(int argc, char * argv[]){
 /*
  *  ###  Verify User Input  ###
  */
-
-// file input: [string to match against] [file to load] [K] [# procs]
-
     if( argc != 5 ){
         throw std::logic_error("[input] insufficient arg count\n");
         return 0;
@@ -137,12 +137,8 @@ int main(int argc, char * argv[]){
 /*
  *  ###  Cleanup  ###
  */
-    /*
-    for(int i = csv.size-1; i != 0; i-- ){
-        delete csv[i];
-    }*/
-    //delete csv;
-    
+
+    free( csv.dataBlock );
 
     return 0;
 }// end main

@@ -92,7 +92,6 @@ pete::util::util( std::string f ){
     rawFloatCount = 0; 
 }
 pete::util::~util(){
-//    free( dataBlock );
 }
 
 /*
@@ -513,6 +512,9 @@ void pete::util::parallel_block_normalize( const uint32_t key, const uint32_t K 
         #if DEBUG
         std::cout << MAGENTA << "[DEBUG] ending child proc " << unsigned(proc_id) << GREY << std::endl;
         #endif
+
+        // Child Cleanup
+        free( local_norm );
 		_exit(0);
     }// END CHILD
 // ### PARENT PROC ###
@@ -580,10 +582,11 @@ void pete::util::parallel_block_normalize( const uint32_t key, const uint32_t K 
     std::sort( normalized.begin(), normalized.end(), norm_sort );
 //    std::cout << "...normalizing " << normalized[0].normal << ", " << normalized[1].normal << ", " << normalized[2].normal << std::endl;
 
-
-
-// remove shm!
+/*
+ * Cleanup
+ */
     shmctl(shmId,IPC_RMID,0);
+    free( reference_block );
 
 }// end parallel_normalize
 

@@ -60,10 +60,12 @@ namespace pete{
 
 class util{
     public:
+        // MEMBERS
         std::map<std::string, uint32_t> blockIndex;
         std::vector<std::string> revBlockIndex;
-
+#if MMAP
         uint8_t *mmappedData;
+#endif
         uint8_t *dataBlock;
 
         uint32_t row_count;
@@ -74,9 +76,11 @@ class util{
 
         std::vector<norm2_t> normalized ;
 
+        // CONSTRUCTOR & DESTRUCTOR
         util( std::string f );
         ~util();
-        
+
+        // PROCESSES
         void import();
         void import2();
         void normalize(const uint32_t key);
